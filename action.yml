@@ -69,6 +69,10 @@ inputs:
     description: >-
       Specifies bash commands to run before the runner starts. It's useful for installing dependencies with apt-get, yum, dnf, etc.
     required: false
+  num-runners:
+    description: >-
+      Number of runners to start on the same instance. Allows to run multiple jobs (e.g. matrix jobs) in parallel.
+    required: false
 
 outputs:
   label:

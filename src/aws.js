@@ -17,7 +17,10 @@ function buildUserDataScript(githubRegistrationToken, label) {
       `./config.sh --url https://github.com/${config.githubContext.owner}/${config.githubContext.repo} --token ${githubRegistrationToken} --labels ${label}`,
       './run.sh'
     ];
-  } else {
+  }
+
+  if (!config.input.numRunners || config.input.numRunners === '1') {
+    // If num runners not specified or just one, we download the runner software and start it as in the original action
     return [
       '#!/bin/bash',
       'mkdir actions-runner && cd actions-runner',
@@ -31,6 +34,27 @@ function buildUserDataScript(githubRegistrationToken, label) {
       './run.sh'
     ];
   }
+
+  const base = [
+    '#!/bin/bash',
+    'mkdir actions-runner && cd actions-runner',
+    `echo "${config.input.preRunnerScript}" > pre-runner-script.sh`,
+    'source pre-runner-script.sh',
+    'case $(uname -m) in aarch64) ARCH="arm64" ;; amd64|x86_64) ARCH="x64" ;; esac && export RUNNER_ARCH=${ARCH}',
+    'curl -O -L https://github.com/actions/runner/releases/download/v2.313.0/actions-runner-linux-${RUNNER_ARCH}-2.313.0.tar.gz',
+  ]
+  for (let i = 1; i <= Number(config.input.numRunners); i++) {
+    // Install each runner in a separate directory
+    base.push(`mkdir ${i} && cd ${i}`);
+    base.push('tar xzf ../actions-runner-linux-${RUNNER_ARCH}-2.313.0.tar.gz');
+    base.push(`export RUNNER_ALLOW_RUNASROOT=1`);
+    base.push(`./config.sh --url https://github.com/${config.githubContext.owner}/${config.githubContext.repo} --token ${githubRegistrationToken} --labels ${label} --name ${label}-${i}`);
+    // Install each runner as a service
+    base.push('sudo ./svc.sh install');
+    base.push('sudo ./svc.sh start');
+    base.push('cd ..');
+  }
+  return base;
 }
 
 async function startEc2Instance(label, githubRegistrationToken) {
